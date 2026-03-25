@@ -2,7 +2,7 @@
 
 import httpx
 
-from bot.config import BotSettings
+from config import BotSettings
 
 
 class LlmClient:

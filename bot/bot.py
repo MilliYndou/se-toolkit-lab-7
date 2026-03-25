@@ -14,19 +14,20 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add the directory containing bot.py to the path for imports
+BOT_DIR = Path(__file__).parent
+sys.path.insert(0, str(BOT_DIR))
 
-from bot.config import settings
-from bot.handlers import (
+from config import settings
+from handlers import (
     handle_help,
     handle_health,
     handle_labs,
     handle_scores,
     handle_start,
 )
-from bot.services.llm_client import LlmClient
-from bot.services.lms_client import LmsClient
+from services.llm_client import LlmClient
+from services.lms_client import LmsClient
 
 
 async def run_test_mode(command: str) -> None:
