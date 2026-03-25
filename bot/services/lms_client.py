@@ -49,6 +49,21 @@ class LmsClient:
             response.raise_for_status()
             return response.json()
 
+    async def get_learners(self) -> list[dict]:
+        """Fetch enrolled learners from the LMS.
+
+        Returns:
+            List of learner records.
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/learners/",
+                headers=self.headers,
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            return response.json()
+
     async def get_pass_rates(self, lab: str) -> list[dict]:
         """Fetch pass rates for a specific lab.
 
@@ -68,8 +83,119 @@ class LmsClient:
             response.raise_for_status()
             return response.json()
 
-    async def get_scores(self, student_id: str | None = None) -> list[dict]:
-        """Fetch student scores from the LMS.
+    async def get_scores(self, lab: str) -> list[dict]:
+        """Fetch score distribution for a specific lab.
+
+        Args:
+            lab: Lab name (e.g., 'lab-01').
+
+        Returns:
+            List of score distribution records.
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/analytics/scores",
+                params={"lab": lab},
+                headers=self.headers,
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_timeline(self, lab: str) -> list[dict]:
+        """Fetch submission timeline for a specific lab.
+
+        Args:
+            lab: Lab name (e.g., 'lab-01').
+
+        Returns:
+            List of timeline records with date and count.
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/analytics/timeline",
+                params={"lab": lab},
+                headers=self.headers,
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_groups(self, lab: str) -> list[dict]:
+        """Fetch per-group performance for a specific lab.
+
+        Args:
+            lab: Lab name (e.g., 'lab-01').
+
+        Returns:
+            List of group performance records.
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/analytics/groups",
+                params={"lab": lab},
+                headers=self.headers,
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_top_learners(self, lab: str, limit: int = 5) -> list[dict]:
+        """Fetch top learners for a specific lab.
+
+        Args:
+            lab: Lab name (e.g., 'lab-01').
+            limit: Number of top learners to return.
+
+        Returns:
+            List of top learner records.
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/analytics/top-learners",
+                params={"lab": lab, "limit": limit},
+                headers=self.headers,
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_completion_rate(self, lab: str) -> dict:
+        """Fetch completion rate for a specific lab.
+
+        Args:
+            lab: Lab name (e.g., 'lab-01').
+
+        Returns:
+            Completion rate record.
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/analytics/completion-rate",
+                params={"lab": lab},
+                headers=self.headers,
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def trigger_sync(self) -> dict:
+        """Trigger ETL pipeline sync.
+
+        Returns:
+            Sync result with new_records and total_records.
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/pipeline/sync",
+                headers=self.headers,
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_scores_legacy(self, student_id: str | None = None) -> list[dict]:
+        """Fetch student scores from the LMS (legacy method).
 
         Args:
             student_id: Optional student ID to filter scores.
