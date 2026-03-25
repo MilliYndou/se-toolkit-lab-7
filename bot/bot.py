@@ -48,36 +48,31 @@ async def run_test_mode(command: str) -> None:
 
     # Handle commands
     if cmd in ["/start", "start"]:
-        response = await handle_start()
+        response = await handle_start(lms_client)
     elif cmd in ["/help", "help"]:
         response = await handle_help()
     elif cmd in ["/health", "health"]:
-        # Check backend health
-        backend_healthy = await lms_client.health_check()
-        status = "✅ Running" if backend_healthy else "❌ Unreachable"
-        response = f"🏥 *Health Status*\n\nBot: ✅ Running\nBackend: {status}"
+        response = await handle_health(lms_client)
     elif cmd in ["/labs", "labs"]:
-        response = await handle_labs()
+        response = await handle_labs(lms_client)
     elif cmd in ["/scores", "scores"]:
-        response = await handle_scores(arg)
+        response = await handle_scores(lms_client, arg)
     else:
         # Try intent recognition for natural language
         intent = await llm_client.recognize_intent(command)
 
         if intent == "start":
-            response = await handle_start()
+            response = await handle_start(lms_client)
         elif intent == "help":
             response = await handle_help()
         elif intent == "health":
-            backend_healthy = await lms_client.health_check()
-            status = "✅ Running" if backend_healthy else "❌ Unreachable"
-            response = f"🏥 *Health Status*\n\nBot: ✅ Running\nBackend: {status}"
+            response = await handle_health(lms_client)
         elif intent == "labs":
-            response = await handle_labs()
+            response = await handle_labs(lms_client)
         elif intent == "scores":
             # Extract lab name from message
             lab_name = arg
-            response = await handle_scores(lab_name)
+            response = await handle_scores(lms_client, lab_name)
         else:
             response = (
                 "I didn't understand that command. Try:\n"
@@ -108,10 +103,14 @@ async def run_telegram_mode() -> None:
     bot = Bot(token=settings.bot_token)
     dp = Dispatcher()
 
+    # Initialize clients
+    lms_client = LmsClient(settings)
+    llm_client = LlmClient(settings)
+
     # Register command handlers
     @dp.message(Command("start"))
     async def cmd_start(message: types.Message):
-        response = await handle_start(message.from_user.first_name)
+        response = await handle_start(lms_client, message.from_user.first_name)
         await message.answer(response)
 
     @dp.message(Command("help"))
@@ -121,20 +120,18 @@ async def run_telegram_mode() -> None:
 
     @dp.message(Command("health"))
     async def cmd_health(message: types.Message):
-        backend_healthy = await lms_client.health_check()
-        status = "✅ Running" if backend_healthy else "❌ Unreachable"
-        response = f"🏥 *Health Status*\n\nBot: ✅ Running\nBackend: {status}"
+        response = await handle_health(lms_client)
         await message.answer(response)
 
     @dp.message(Command("labs"))
     async def cmd_labs(message: types.Message):
-        response = await handle_labs()
+        response = await handle_labs(lms_client)
         await message.answer(response)
 
     @dp.message(Command("scores"))
     async def cmd_scores(message: types.Message):
         lab_name = message.text.split(maxsplit=1)[1] if len(message.text.split()) > 1 else None
-        response = await handle_scores(lab_name)
+        response = await handle_scores(lms_client, lab_name)
         await message.answer(response)
 
     # Start polling
