@@ -26,7 +26,7 @@ from handlers import (
     handle_scores,
     handle_start,
 )
-from services.llm_client import LlmClient
+from services.intent_router import IntentRouter
 from services.lms_client import LmsClient
 
 
@@ -38,7 +38,7 @@ async def run_test_mode(command: str) -> None:
     """
     # Initialize clients
     lms_client = LmsClient(settings)
-    llm_client = LlmClient(settings)
+    intent_router = IntentRouter(settings, lms_client)
 
     # Parse the command
     command = command.strip()
@@ -46,7 +46,7 @@ async def run_test_mode(command: str) -> None:
     cmd = parts[0].lower()
     arg = parts[1] if len(parts) > 1 else None
 
-    # Handle commands
+    # Check if it's a slash command or natural language
     if cmd in ["/start", "start"]:
         response = await handle_start(lms_client)
     elif cmd in ["/help", "help"]:
@@ -58,29 +58,8 @@ async def run_test_mode(command: str) -> None:
     elif cmd in ["/scores", "scores"]:
         response = await handle_scores(lms_client, arg)
     else:
-        # Try intent recognition for natural language
-        intent = await llm_client.recognize_intent(command)
-
-        if intent == "start":
-            response = await handle_start(lms_client)
-        elif intent == "help":
-            response = await handle_help()
-        elif intent == "health":
-            response = await handle_health(lms_client)
-        elif intent == "labs":
-            response = await handle_labs(lms_client)
-        elif intent == "scores":
-            # Extract lab name from message
-            lab_name = arg
-            response = await handle_scores(lms_client, lab_name)
-        else:
-            response = (
-                "I didn't understand that command. Try:\n"
-                "/start - Welcome message\n"
-                "/help - Available commands\n"
-                "/labs - View labs\n"
-                "/scores <lab> - Check scores"
-            )
+        # Use intent router for natural language queries
+        response = await intent_router.route(command)
 
     print(response)
 
@@ -95,6 +74,7 @@ async def run_telegram_mode() -> None:
     try:
         from aiogram import Bot, Dispatcher, types
         from aiogram.filters import Command
+        from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
     except ImportError:
         print("Error: aiogram not installed. Run: uv sync")
         sys.exit(1)
@@ -105,13 +85,32 @@ async def run_telegram_mode() -> None:
 
     # Initialize clients
     lms_client = LmsClient(settings)
-    llm_client = LlmClient(settings)
+    intent_router = IntentRouter(settings, lms_client)
+
+    # Create inline keyboard for /start
+    def get_start_keyboard() -> InlineKeyboardMarkup:
+        """Create inline keyboard with quick actions."""
+        keyboard = [
+            [
+                InlineKeyboardButton(text="📋 Available Labs", callback_data="labs"),
+                InlineKeyboardButton(text="🏥 Health Check", callback_data="health"),
+            ],
+            [
+                InlineKeyboardButton(text="📊 Lab Scores", callback_data="scores_lab-01"),
+                InlineKeyboardButton(text="❓ Help", callback_data="help"),
+            ],
+            [
+                InlineKeyboardButton(text="🤖 Top Learners", callback_data="top_learners"),
+                InlineKeyboardButton(text="📈 Completion Rate", callback_data="completion"),
+            ],
+        ]
+        return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
     # Register command handlers
     @dp.message(Command("start"))
     async def cmd_start(message: types.Message):
         response = await handle_start(lms_client, message.from_user.first_name)
-        await message.answer(response)
+        await message.answer(response, reply_markup=get_start_keyboard())
 
     @dp.message(Command("help"))
     async def cmd_help(message: types.Message):
@@ -133,6 +132,50 @@ async def run_telegram_mode() -> None:
         lab_name = message.text.split(maxsplit=1)[1] if len(message.text.split()) > 1 else None
         response = await handle_scores(lms_client, lab_name)
         await message.answer(response)
+
+    # Handle callback queries from inline keyboard
+    @dp.callback_query(lambda c: c.data)
+    async def process_callback_query(callback_query: types.CallbackQuery):
+        """Handle inline keyboard button clicks."""
+        data = callback_query.data
+
+        if data == "labs":
+            response = await handle_labs(lms_client)
+        elif data == "health":
+            response = await handle_health(lms_client)
+        elif data == "help":
+            response = await handle_help()
+        elif data.startswith("scores_"):
+            lab_name = data.replace("scores_", "")
+            response = await handle_scores(lms_client, lab_name)
+        elif data == "top_learners":
+            response = await intent_router.route("Show me the top 5 learners in lab-01")
+        elif data == "completion":
+            response = await intent_router.route("What is the completion rate for lab-01")
+        else:
+            response = "Unknown action. Use /help for available commands."
+
+        await callback_query.message.answer(response)
+        await callback_query.answer()
+
+    # Handle all other messages with intent router
+    @dp.message()
+    async def handle_message(message: types.Message):
+        """Handle natural language messages with intent routing."""
+        if not message.text:
+            return
+
+        # Show typing indicator
+        await message.bot.send_chat_action(chat_id=message.chat.id, action="typing")
+
+        try:
+            response = await intent_router.route(message.text)
+            await message.answer(response)
+        except Exception as e:
+            print(f"[error] Message handling error: {e}", file=sys.stderr)
+            await message.answer(
+                "I encountered an error processing your message. Please try again or use /help for commands."
+            )
 
     # Start polling
     print("Starting Telegram bot...")
