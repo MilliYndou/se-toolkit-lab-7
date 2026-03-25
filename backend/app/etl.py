@@ -56,7 +56,11 @@ class ApiLogsPage(BaseModel):
 
 async def fetch_items() -> list[ApiItem]:
     """Fetch the lab/task catalog from the autochecker API."""
-    async with httpx.AsyncClient(timeout=60) as client:
+    async with httpx.AsyncClient(
+        timeout=60,
+        follow_redirects=False,
+        limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+    ) as client:
         resp = await client.get(
             f"{settings.autochecker_api_url}/api/items",
             auth=(settings.autochecker_email, settings.autochecker_password),
@@ -68,14 +72,19 @@ async def fetch_items() -> list[ApiItem]:
 async def fetch_logs(since: datetime | None = None) -> list[ApiLog]:
     """Fetch check results from the autochecker API with pagination."""
     all_logs: list[ApiLog] = []
+    cursor = since
 
-    async with httpx.AsyncClient(timeout=60) as client:
-        cursor = since
-        while True:
-            params: dict[str, str | int] = {"limit": 500}
-            if cursor is not None:
-                params["since"] = cursor.isoformat()
+    while True:
+        params: dict[str, str | int] = {"limit": 500}
+        if cursor is not None:
+            params["since"] = cursor.isoformat()
 
+        # Create a fresh client for each request to avoid connection issues
+        async with httpx.AsyncClient(
+            timeout=60,
+            follow_redirects=False,
+            limits=httpx.Limits(max_keepalive_connections=1, max_connections=1),
+        ) as client:
             resp = await client.get(
                 f"{settings.autochecker_api_url}/api/logs",
                 params=params,
@@ -84,12 +93,12 @@ async def fetch_logs(since: datetime | None = None) -> list[ApiLog]:
             resp.raise_for_status()
             page = ApiLogsPage.model_validate(resp.json())
 
-            all_logs.extend(page.logs)
+        all_logs.extend(page.logs)
 
-            if not page.has_more or not page.logs:
-                break
+        if not page.has_more or not page.logs:
+            break
 
-            cursor = datetime.fromisoformat(page.logs[-1].submitted_at)
+        cursor = datetime.fromisoformat(page.logs[-1].submitted_at)
 
     return all_logs
 
