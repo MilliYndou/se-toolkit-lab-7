@@ -63,6 +63,90 @@ This is what a customer might tell you. Your job is to turn it into a working pr
 3. Deployed and running on VM
 4. README documents deployment
 
+## Deploy
+
+### Prerequisites
+
+Before deploying, ensure you have the following in your `.env.docker.secret`:
+
+```bash
+# Telegram Bot Token (from @BotFather)
+BOT_TOKEN=your-bot-token-here
+
+# LMS API
+LMS_API_KEY=your-lms-api-key
+
+# LLM API (optional, for natural language queries)
+LLM_API_KEY=your-llm-api-key
+LLM_API_BASE_URL=http://localhost:42005/v1
+LLM_API_MODEL=coder-model
+```
+
+### Deploy with Docker Compose
+
+1. **Stop any running bot process:**
+   ```bash
+   pkill -f "bot.py" 2>/dev/null || true
+   ```
+
+2. **Start all services:**
+   ```bash
+   cd ~/se-toolkit-lab-7
+   docker compose --env-file .env.docker.secret up --build -d
+   ```
+
+3. **Verify services are running:**
+   ```bash
+   docker compose --env-file .env.docker.secret ps
+   ```
+
+   You should see:
+   - `se-toolkit-lab-7-backend-1` - Backend API
+   - `se-toolkit-lab-7-postgres-1` - PostgreSQL database
+   - `se-toolkit-lab-7-pgadmin-1` - pgAdmin (optional)
+   - `se-toolkit-lab-7-caddy-1` - Frontend proxy
+   - `se-toolkit-lab-7-bot-1` - Telegram bot
+
+4. **Check bot logs:**
+   ```bash
+   docker compose --env-file .env.docker.secret logs bot --tail=20
+   ```
+
+   Look for:
+   - "Starting Telegram bot..." - Bot started successfully
+   - "HTTP Request: POST .../getUpdates" - Bot is polling for messages
+   - No Python tracebacks
+
+### Verify in Telegram
+
+Send these commands to your bot in Telegram:
+
+| Command | Expected Response |
+|---------|------------------|
+| `/start` | Welcome message with inline keyboard |
+| `/health` | Backend status with item count |
+| `/labs` | List of available labs |
+| `/scores lab-01` | Pass rates for lab-01 |
+| "what labs are available?" | Natural language response |
+| "which lab has the lowest pass rate?" | Multi-step analysis |
+
+### Troubleshooting
+
+**Bot container keeps restarting:**
+```bash
+docker compose --env-file .env.docker.secret logs bot
+```
+Check for missing environment variables or import errors.
+
+**LLM queries fail:**
+- Ensure `LLM_API_BASE_URL` uses `host.docker.internal` in Docker
+- The Qwen proxy must be running on the host
+- Test: `curl http://localhost:42005/v1/chat/completions ...`
+
+**Backend connection errors:**
+- The bot uses `http://backend:8000` inside Docker (not localhost)
+- Verify backend is healthy: `curl http://localhost:42002/docs`
+
 ## Learning advice
 
 Notice the progression above: **product brief** (vague customer ask) → **prioritized requirements** (structured) → **task specifications** (precise deliverables + acceptance criteria). This is how engineering work flows.
