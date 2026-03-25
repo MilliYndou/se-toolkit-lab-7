@@ -10,11 +10,12 @@ ENV UV_PYTHON_DOWNLOADS=0
 
 WORKDIR /app
 
-# Sync dependencies first (better layer caching)
+# Sync dependencies from workspace root (bot uses root uv.lock)
 RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=bot/pyproject.toml,target=bot/pyproject.toml \
-    --mount=type=bind,source=bot/uv.lock,target=bot/uv.lock \
-    uv sync --frozen --no-install-project --directory bot
+    uv sync --frozen --no-install-project
 
 # Copy bot source code
 COPY bot /app/bot
@@ -22,7 +23,7 @@ COPY pyproject.toml uv.lock /app/
 
 # Sync again with the actual code
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --directory bot
+    uv sync --frozen
 
 # ---
 # Runtime image
@@ -43,11 +44,11 @@ RUN groupadd --system --gid 999 nonroot \
 COPY --from=builder --chown=nonroot:nonroot /app /app
 
 # Add virtual environment to PATH
-ENV PATH="/app/bot/.venv/bin:$PATH"
+ENV PATH="/app/.venv/bin:$PATH"
 
-WORKDIR /app/bot
+WORKDIR /app
 
 USER nonroot
 
-# Run the bot
-CMD ["python", "bot.py"]
+# Run the bot from bot directory
+CMD ["python", "bot/bot.py"]
