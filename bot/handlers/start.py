@@ -1,10 +1,16 @@
 """Handler for /start command."""
 
+from typing import TYPE_CHECKING
 
-async def handle_start(user_name: str | None = None) -> str:
+if TYPE_CHECKING:
+    from services.lms_client import LmsClient
+
+
+async def handle_start(lms_client: "LmsClient" | None = None, user_name: str | None = None) -> str:
     """Handle the /start command.
 
     Args:
+        lms_client: Optional LMS client for backend integration.
         user_name: Optional name of the user for personalization.
 
     Returns:

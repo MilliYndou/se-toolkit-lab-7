@@ -48,36 +48,31 @@ async def run_test_mode(command: str) -> None:
 
     # Handle commands
     if cmd in ["/start", "start"]:
-        response = await handle_start()
+        response = await handle_start(lms_client)
     elif cmd in ["/help", "help"]:
         response = await handle_help()
     elif cmd in ["/health", "health"]:
-        # Check backend health
-        backend_healthy = await lms_client.health_check()
-        status = "✅ Running" if backend_healthy else "❌ Unreachable"
-        response = f"🏥 *Health Status*\n\nBot: ✅ Running\nBackend: {status}"
+        response = await handle_health(lms_client)
     elif cmd in ["/labs", "labs"]:
-        response = await handle_labs()
+        response = await handle_labs(lms_client)
     elif cmd in ["/scores", "scores"]:
-        response = await handle_scores(arg)
+        response = await handle_scores(lms_client, arg)
     else:
         # Try intent recognition for natural language
         intent = await llm_client.recognize_intent(command)
 
         if intent == "start":
-            response = await handle_start()
+            response = await handle_start(lms_client)
         elif intent == "help":
             response = await handle_help()
         elif intent == "health":
-            backend_healthy = await lms_client.health_check()
-            status = "✅ Running" if backend_healthy else "❌ Unreachable"
-            response = f"🏥 *Health Status*\n\nBot: ✅ Running\nBackend: {status}"
+            response = await handle_health(lms_client)
         elif intent == "labs":
-            response = await handle_labs()
+            response = await handle_labs(lms_client)
         elif intent == "scores":
             # Extract lab name from message
             lab_name = arg
-            response = await handle_scores(lab_name)
+            response = await handle_scores(lms_client, lab_name)
         else:
             response = (
                 "I didn't understand that command. Try:\n"

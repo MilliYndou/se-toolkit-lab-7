@@ -40,17 +40,33 @@ class LmsClient:
         Returns:
             List of lab items.
         """
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{self.base_url}/items/",
-                    headers=self.headers,
-                    timeout=10.0,
-                )
-                response.raise_for_status()
-                return response.json()
-        except Exception:
-            return []
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/items/",
+                headers=self.headers,
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_pass_rates(self, lab: str) -> list[dict]:
+        """Fetch pass rates for a specific lab.
+
+        Args:
+            lab: Lab name (e.g., 'lab-01').
+
+        Returns:
+            List of pass rate records with task, avg_score, attempts.
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/analytics/pass-rates",
+                params={"lab": lab},
+                headers=self.headers,
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            return response.json()
 
     async def get_scores(self, student_id: str | None = None) -> list[dict]:
         """Fetch student scores from the LMS.
@@ -61,14 +77,11 @@ class LmsClient:
         Returns:
             List of score records.
         """
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{self.base_url}/interactions/",
-                    headers=self.headers,
-                    timeout=10.0,
-                )
-                response.raise_for_status()
-                return response.json()
-        except Exception:
-            return []
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/interactions/",
+                headers=self.headers,
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            return response.json()
